@@ -44,12 +44,31 @@ def roi_polygon_to_mask(roi, shape: Tuple[int, int], *, transpose_xy: bool = Fal
 
 
 def tight_crop_nd(arr: np.ndarray, mask: np.ndarray) -> Tuple[np.ndarray, Tuple[int, int, int, int]]:
-    """Crop ``arr`` to the bounding box of ``mask`` (supports N‑D arrays)."""
+    """Crop ``arr`` to the bounding box of ``mask``.
+
+    ``arr`` may be in either HWC or CHW layout (or any N‑D array where the mask
+    matches the first two or last two dimensions).  The returned array preserves
+    the channel axis order of the input.
+    """
+
     ys, xs = np.nonzero(mask)
     y0, y1 = ys.min(), ys.max() + 1
     x0, x1 = xs.min(), xs.max() + 1
-    sl = [slice(None)] * (arr.ndim - 2) + [slice(y0, y1), slice(x0, x1)]
-    return arr[tuple(sl)], (y0, y1, x0, x1)
+
+    if arr.shape[:2] == mask.shape:
+        # ``arr`` is HWC (or starts with Y,X)
+        cropped = arr[y0:y1, x0:x1, ...]
+    elif arr.shape[-2:] == mask.shape:
+        # ``arr`` is CHW (or ends with Y,X)
+        sl = [slice(None)] * (arr.ndim - 2) + [slice(y0, y1), slice(x0, x1)]
+        cropped = arr[tuple(sl)]
+    else:
+        raise ValueError(
+            "mask shape does not match array dimensions; expected mask to align with "
+            "either the first two or last two axes of the array"
+        )
+
+    return cropped, (y0, y1, x0, x1)
 
 
 def to_uint8_vis(img2d: np.ndarray) -> np.ndarray:
