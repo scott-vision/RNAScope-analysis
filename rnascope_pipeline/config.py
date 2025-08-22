@@ -20,7 +20,7 @@ class Config:
     """
 
     # Paths
-    root: Path = Path(".")
+    root: Path = Path("../RNAScope/")
     """Project root containing ``Rat*`` folders and the ``maxima/`` directory."""
 
     out_dir: Path = Path("results_rnascope")
