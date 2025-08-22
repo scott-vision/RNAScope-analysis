@@ -7,6 +7,7 @@ from typing import Dict, List, Tuple
 
 import numpy as np
 import tifffile as tiff
+from skimage.io import imsave
 
 from .config import Config
 from .image_utils import (
@@ -74,10 +75,8 @@ def analyze_roi(
     roi_mask_name = f"{animal}_{region}_{roi_name}_roi_mask_cropped.tif"
     tiff.imwrite(str(cfg.roi_masks_dir / roi_mask_name), (mask_c.astype(np.uint8) * 255))
 
-    # Overlay background from masked DAPI
+    # DAPI channel for segmentation
     dapi = cutout_masked[..., cfg.dapi_index]
-    dapi_u8 = to_uint8_vis(dapi)
-    overlay_rgb = make_rgb_background(dapi_u8)
 
     # Select maxima inside ROI & convert to local coords
     def in_roi_and_local(x_all, y_all):
@@ -100,12 +99,19 @@ def analyze_roi(
     goa_x, goa_y = in_roi_and_local(goa_x_all, goa_y_all)
     log(cfg, f"    maxima counts in ROI: GOA={len(goa_x)}, GOB={len(gob_x)}")
 
-    # Save overlay with crosses
-    draw_crosses_inplace(overlay_rgb, gob_x, gob_y, color=(255, 0, 0), size=cfg.spot_marker_size)
-    draw_crosses_inplace(overlay_rgb, goa_x, goa_y, color=(0, 255, 255), size=cfg.spot_marker_size)
-    overlay_name = f"{animal}_{region}_{roi_name}_cutout_maxima.tif"
-    tiff.imwrite(str(cfg.qc_overlays_dir / overlay_name), overlay_rgb, photometric="rgb")
-    log(cfg, f"    saved overlay → {cfg.qc_overlays_dir / overlay_name}")
+    # Save separate GOA and GOB overlays
+    goa_bg = to_uint8_vis(cutout_masked[..., cfg.goa_index])
+    gob_bg = to_uint8_vis(cutout_masked[..., cfg.gob_index])
+    goa_overlay = make_rgb_background(goa_bg)
+    gob_overlay = make_rgb_background(gob_bg)
+    draw_crosses_inplace(goa_overlay, goa_x, goa_y, color=(0, 255, 255), size=cfg.spot_marker_size)
+    draw_crosses_inplace(gob_overlay, gob_x, gob_y, color=(255, 0, 0), size=cfg.spot_marker_size)
+    overlay_name_goa = f"{animal}_{region}_{roi_name}_goa_maxima.png"
+    overlay_name_gob = f"{animal}_{region}_{roi_name}_gob_maxima.png"
+    imsave(str(cfg.qc_overlays_dir / overlay_name_goa), goa_overlay)
+    imsave(str(cfg.qc_overlays_dir / overlay_name_gob), gob_overlay)
+    log(cfg, f"    saved GOA overlay → {cfg.qc_overlays_dir / overlay_name_goa}")
+    log(cfg, f"    saved GOB overlay → {cfg.qc_overlays_dir / overlay_name_gob}")
 
     # Segment nuclei
     mask_path = cfg.masks_dir / f"{animal}_{region}_{roi_name}_labels.tif"

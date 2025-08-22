@@ -77,7 +77,7 @@ project_root/
 All results are written under `results_rnascope/` (configurable):
 
 * **`cutouts/`** – Free‑form masked ROI cutouts (outside polygon set to 0). One per polygon ROI.
-* **`qc_overlays/`** – Masked DAPI overlays with maxima crosses (GOB=red, GOA=cyan).
+* **`qc_overlays/`** – Normalised GOA and GOB channel overlays with their respective maxima crosses (GOB=red, GOA=cyan) saved as PNG.
 * **`roi_masks_cropped/`** – Cropped polygon masks for sanity checks (binary 0/255).
 * **`masks/`** – Cellpose **labels** per polygon ROI (cached for reuse).
 * **`csv/`** – Tables:
@@ -177,7 +177,8 @@ found 3 experiment(s): ['Rat1', 'Rat2', 'Rat3']
   > ROI 'CA1': starting analysis
     cutout bbox=(6024:11257,3824:5297) size=(3, 5233, 1473) masked_size=(3, 5233, 1473)
     maxima counts in ROI: GOA=27842, GOB=11821
-    saved overlay → results_rnascope/qc_overlays/Rat1_hippo_CA1_cutout_maxima.tif
+    saved GOA overlay → results_rnascope/qc_overlays/Rat1_hippo_CA1_goa_maxima.png
+    saved GOB overlay → results_rnascope/qc_overlays/Rat1_hippo_CA1_gob_maxima.png
     computed & saved labels: n_nuclei=...
     expanded labels by 17px (~2.5 µm)
     ROI area=... µm² | densities: GOA=.../µm², GOB=.../µm² | ratio GOA:GOB=...
