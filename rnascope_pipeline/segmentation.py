@@ -7,8 +7,9 @@ from cellpose import models
 
 
 def create_model() -> models.CellposeModel:
-    """Instantiate a default Cellpose model."""
-    return models.CellposeModel()
+    """Instantiate a default Cellpose model with GPU if available."""
+    use_gpu = models.use_gpu()
+    return models.CellposeModel(gpu=use_gpu)
 
 
 def segment_nuclei(dapi_img: np.ndarray, model: models.CellposeModel) -> np.ndarray:
