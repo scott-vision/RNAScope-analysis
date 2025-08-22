@@ -8,7 +8,7 @@ from cellpose import models
 
 def create_model() -> models.CellposeModel:
     """Instantiate a default Cellpose model with GPU if available."""
-    use_gpu = models.use_gpu()
+    use_gpu = True
     return models.CellposeModel(gpu=use_gpu)
 
 
