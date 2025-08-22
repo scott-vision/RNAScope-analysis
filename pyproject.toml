@@ -1,0 +1,19 @@
+[project]
+name = "rnascope-analysis"
+version = "0.1.0"
+description = "Modular RNAscope end-to-end analysis pipeline"
+authors = [{name = "Your Name"}]
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "cellpose",
+    "scikit-image",
+    "numpy",
+    "pandas",
+    "tifffile",
+    "roifile",
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
