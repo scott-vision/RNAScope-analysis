@@ -91,14 +91,20 @@ def apply_red_lut(gray: np.ndarray) -> np.ndarray:
 
 
 def apply_orange_hot_lut(gray: np.ndarray) -> np.ndarray:
-    """Map ``gray`` to an orange hot lookup table."""
-    norm = gray.astype(np.float32) / 255.0
-    r = np.clip(norm * 3.0, 0, 1)
-    g = (
-        np.clip((norm - 1.0 / 3.0) * 3.0, 0, 1) * (165.0 / 255.0)
-    )  # saturate at orange (~255,165,0)
-    rgb = np.stack([r, g, np.zeros_like(r)], axis=-1)
-    return (rgb * 255).astype(np.uint8)
+    """Map ``gray`` to an orange lookup table for visualisation.
+
+    ``apply_red_lut`` linearly maps the input intensity to the red channel. To
+    achieve a similar effect for an orange tint we keep the red channel equal to
+    the original intensity and scale the green channel so that the brightest
+    value corresponds to ``(255, 165, 0)`` (orange). This preserves intensity
+    variation while producing an orange overlay instead of a flat mask.
+    """
+
+    # Scale the green channel relative to red so that the maximum intensity
+    # corresponds to the RGB colour (255, 165, 0).
+    green = (gray.astype(np.float32) * (165.0 / 255.0)).astype(np.uint8)
+    zeros = np.zeros_like(gray)
+    return np.stack([gray, green, zeros], axis=-1)
 
 
 def draw_crosses_inplace(rgb: np.ndarray, xs: np.ndarray, ys: np.ndarray, *, color: tuple, size: int) -> None:
