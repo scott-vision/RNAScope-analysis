@@ -13,7 +13,8 @@ from .config import Config
 from .image_utils import (
     draw_crosses_inplace,
     expand_label_mask,
-    make_rgb_background,
+    apply_orange_hot_lut,
+    apply_red_lut,
     tight_crop_nd,
     to_uint8_vis,
 )
@@ -102,10 +103,10 @@ def analyze_roi(
     # Save separate GOA and GOB overlays
     goa_bg = to_uint8_vis(cutout_masked[..., cfg.goa_index])
     gob_bg = to_uint8_vis(cutout_masked[..., cfg.gob_index])
-    goa_overlay = make_rgb_background(goa_bg)
-    gob_overlay = make_rgb_background(gob_bg)
+    goa_overlay = apply_red_lut(goa_bg)
+    gob_overlay = apply_orange_hot_lut(gob_bg)
     draw_crosses_inplace(goa_overlay, goa_x, goa_y, color=(0, 255, 255), size=cfg.spot_marker_size)
-    draw_crosses_inplace(gob_overlay, gob_x, gob_y, color=(255, 0, 0), size=cfg.spot_marker_size)
+    draw_crosses_inplace(gob_overlay, gob_x, gob_y, color=(0, 255, 255), size=cfg.spot_marker_size)
     overlay_name_goa = f"{animal}_{region}_{roi_name}_goa_maxima.png"
     overlay_name_gob = f"{animal}_{region}_{roi_name}_gob_maxima.png"
     imsave(str(cfg.qc_overlays_dir / overlay_name_goa), goa_overlay)
