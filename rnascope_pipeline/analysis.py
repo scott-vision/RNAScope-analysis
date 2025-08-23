@@ -214,12 +214,19 @@ def analyze_roi(
     hscore_goa = sum(b * c for b, c in bins_goa.items())
     hscore_gob = sum(b * c for b, c in bins_gob.items())
 
+    avg_goa_per_cell = float(np.mean(goa_exp_counts)) if len(goa_exp_counts) > 0 else np.nan
+    avg_gob_per_cell = float(np.mean(gob_exp_counts)) if len(gob_exp_counts) > 0 else np.nan
+    ratio_avg_goa_gob = (
+        (avg_goa_per_cell / avg_gob_per_cell) if avg_gob_per_cell > 0 else np.nan
+    )
+
     log(
         cfg,
         "    per‑ROI: "
         f"n_cells={len(per_nucleus_rows)}, moreGOA={cells_more_goa}, "
         f"moreGOB={cells_more_gob}, noSpots={cells_no_spots}, "
-        f"Hs(GOA/GOB)={hscore_goa}/{hscore_gob}",
+        f"Hs(GOA/GOB)={hscore_goa}/{hscore_gob}, "
+        f"avg(GOA/GOB)={avg_goa_per_cell:.3f}/{avg_gob_per_cell:.3f}",
     )
 
     per_roi_row: Dict[str, float] = {
@@ -233,6 +240,9 @@ def analyze_roi(
         "GoA_density_per_um2": goa_density,
         "GoB_density_per_um2": gob_density,
         "GoA_to_GoB_ratio": ratio_goa_gob,
+        "GoA_avg_spots_per_cell": avg_goa_per_cell,
+        "GoB_avg_spots_per_cell": avg_gob_per_cell,
+        "GoA_to_GoB_avg_spot_ratio": ratio_avg_goa_gob,
         "cells_more_GoA": cells_more_goa,
         "cells_more_GoA_prop": cells_more_goa / n_cells,
         "cells_more_GoB": cells_more_gob,

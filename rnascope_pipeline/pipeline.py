@@ -130,6 +130,9 @@ def run_pipeline(cfg: Config) -> None:
         total_cells = len(per_nuc_df)
         goa_all = per_nuc_df["GoA_expanded"].to_numpy(int)
         gob_all = per_nuc_df["GoB_expanded"].to_numpy(int)
+        avg_goa_all = float(goa_all.mean()) if total_cells > 0 else np.nan
+        avg_gob_all = float(gob_all.mean()) if total_cells > 0 else np.nan
+        avg_ratio_all = (avg_goa_all / avg_gob_all) if avg_gob_all > 0 else np.nan
         cells_more_goa_all = int(np.sum(goa_all > gob_all))
         cells_more_gob_all = int(np.sum(gob_all > goa_all))
         cells_no_spots_all = int(np.sum((goa_all == 0) & (gob_all == 0)))
@@ -151,6 +154,9 @@ def run_pipeline(cfg: Config) -> None:
             "cells_any_GoA_prop": cells_any_goa_all / total_cells,
             "cells_any_GoB": cells_any_gob_all,
             "cells_any_GoB_prop": cells_any_gob_all / total_cells,
+            "GoA_avg_spots_per_cell": avg_goa_all,
+            "GoB_avg_spots_per_cell": avg_gob_all,
+            "GoA_to_GoB_avg_spot_ratio": avg_ratio_all,
             "GoA_Hscore": hscore_goa_all,
             "GoA_Hscore_norm": hscore_goa_all / total_cells,
             "GoB_Hscore": hscore_gob_all,
