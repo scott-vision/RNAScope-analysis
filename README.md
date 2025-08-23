@@ -77,7 +77,7 @@ project_root/
 All results are written under `results_rnascope/` (configurable):
 
 * **`cutouts/`** – Free‑form masked ROI cutouts (outside polygon set to 0). One per polygon ROI.
-* **`qc_overlays/`** – Normalised GOA and GOB channel overlays with their respective maxima crosses (GOB=red, GOA=cyan) saved as PNG.
+* **`qc_overlays/`** – Normalised GOA (red) and GOB (orange) channel overlays with maxima crosses in cyan saved as PNG.
 * **`roi_masks_cropped/`** – Cropped polygon masks for sanity checks (binary 0/255).
 * **`masks/`** – Cellpose **labels** per polygon ROI (cached for reuse).
 * **`csv/`** – Tables:

@@ -94,7 +94,9 @@ def apply_orange_hot_lut(gray: np.ndarray) -> np.ndarray:
     """Map ``gray`` to an orange hot lookup table."""
     norm = gray.astype(np.float32) / 255.0
     r = np.clip(norm * 3.0, 0, 1)
-    g = np.clip((norm - 1.0 / 3.0) * 3.0, 0, 1)
+    g = (
+        np.clip((norm - 1.0 / 3.0) * 3.0, 0, 1) * (165.0 / 255.0)
+    )  # saturate at orange (~255,165,0)
     rgb = np.stack([r, g, np.zeros_like(r)], axis=-1)
     return (rgb * 255).astype(np.uint8)
 
