@@ -84,6 +84,21 @@ def make_rgb_background(gray: np.ndarray) -> np.ndarray:
     return np.stack([gray, gray, gray], axis=-1)
 
 
+def apply_red_lut(gray: np.ndarray) -> np.ndarray:
+    """Map ``gray`` to a red lookup table for visualisation."""
+    zeros = np.zeros_like(gray)
+    return np.stack([gray, zeros, zeros], axis=-1)
+
+
+def apply_orange_hot_lut(gray: np.ndarray) -> np.ndarray:
+    """Map ``gray`` to an orange hot lookup table."""
+    norm = gray.astype(np.float32) / 255.0
+    r = np.clip(norm * 3.0, 0, 1)
+    g = np.clip((norm - 1.0 / 3.0) * 3.0, 0, 1)
+    rgb = np.stack([r, g, np.zeros_like(r)], axis=-1)
+    return (rgb * 255).astype(np.uint8)
+
+
 def draw_crosses_inplace(rgb: np.ndarray, xs: np.ndarray, ys: np.ndarray, *, color: tuple, size: int) -> None:
     """Draw coloured crosses onto ``rgb`` in‑place."""
     h, w, _ = rgb.shape

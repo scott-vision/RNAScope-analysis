@@ -42,7 +42,7 @@ class Config:
     goa_index: int = 2
     """Channel index for the GoA channel."""
 
-    spot_marker_size: int = 3
+    spot_marker_size: int = 1
     """Half size of the cross used to mark spots in overlay images."""
 
     load_saved_masks: bool = True
