@@ -126,10 +126,11 @@ Per **ROI**:
 * ROI area (µm²)
 * Totals & densities (spots/µm²) for GoA & GoB
 * GOA:GOB ratio (NaN if GOB=0)
+* Average spots per cell for GoA & GoB (cell-associated only) and their ratio
 * Proportions: cells with more GoA/Gob, any GoA/GoB, or no spots
 * Bin counts & proportions; **H‑score** = Σ(bin × count) and normalized per cell
 
-**Overall**: same summaries pooled across all nuclei.
+**Overall**: same summaries pooled across all nuclei, including average spots per cell metrics.
 
 ---
 
