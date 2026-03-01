@@ -23,16 +23,33 @@ The workflow:
   * `tifffile`
   * `roifile`
 
-Install in a fresh environment:
+Install with conda in a fresh environment.
+
+### Option A: CPU (no GPU acceleration)
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install --upgrade pip
-pip install cellpose scikit-image numpy pandas tifffile roifile
+conda create -n rnascope-cpu python=3.10 -y
+conda activate rnascope-cpu
+python -m pip install --upgrade pip
+pip install -r requirements-cpu.txt
+pip install -e .
 ```
 
-> **GPU (optional):** Cellpose will use GPU if available (CUDA/CuDNN properly installed). Otherwise it falls back to CPU.
+### Option B: GPU (faster Cellpose)
+
+```bash
+conda create -n rnascope-gpu python=3.10 -y
+conda activate rnascope-gpu
+python -m pip install --upgrade pip
+pip install -r requirements-gpu.txt
+pip install -e .
+```
+
+Notes:
+
+* `requirements-gpu.txt` targets CUDA 12.6 wheels from PyTorch.
+* If your CUDA runtime is different, update the first line in `requirements-gpu.txt` using the selector at https://pytorch.org/get-started/locally/.
+* Verify GPU availability with: `python -c "import torch; print(torch.cuda.is_available())"`
 
 ---
 
@@ -185,6 +202,69 @@ found 3 experiment(s): ['Rat1', 'Rat2', 'Rat3']
     ROI area=... µm² | densities: GOA=.../µm², GOB=.../µm² | ratio GOA:GOB=...
   < ROI 'CA1': done in 47.6s
 ```
+
+---
+
+## Center ROI QC Visualizer (for settings checks)
+
+Use `visualize_roi_centers.py` to quickly inspect whether nuclei segmentation and maxima assignment look reasonable for each folder in `Max-Projections`.
+
+This script is designed for parameter validation, not final quantification. For each ROI it extracts a small patch around the center of the ROI and saves a side-by-side panel:
+
+* **Left panel (original composite):** `R=GoA`, `G=GoB`, `B=DAPI`
+* **Right panel (analysis overlay):** DAPI background + Cellpose nucleus boundaries (green) + maxima points (`GOA=magenta`, `GOB=cyan`)
+
+### Why use it
+
+* Sanity-check channel indexing and coordinate orientation (`transpose_xy`)
+* Verify Cellpose nuclei boundaries are sensible on your data
+* Confirm maxima points align to tissue and nuclei in each ROI
+* Compare settings quickly across animals/regions without running full downstream analysis
+
+### Run it
+
+From the project root:
+
+```bash
+python visualize_roi_centers.py --root Max-Projections --out results_center_qc
+```
+
+Useful targeted examples:
+
+```bash
+# One animal while tuning
+python visualize_roi_centers.py --root Max-Projections --out results_center_qc --animals Rat1
+
+# Limit ROIs for faster checks
+python visualize_roi_centers.py --root Max-Projections --out results_center_qc --animals Rat1 --max-rois-per-region 2
+
+# Smaller center patch
+python visualize_roi_centers.py --root Max-Projections --out results_center_qc --patch-size 512
+```
+
+### Outputs
+
+Under your `--out` directory:
+
+* `qc_panels/` -> one PNG per ROI: `<animal>_<region>_<roi>_center_qc.png`
+* `masks/` -> cached Cellpose labels per ROI (`*_labels.tif`) for faster reruns
+
+### Main options
+
+* `--root`: data root (default: `Max-Projections`)
+* `--out`: output directory (default: `results_center_qc`)
+* `--animals`: optional list of folders to process (for example `Rat1 Mouse0`)
+* `--max-rois-per-region`: limit number of ROI files per region (`0` means all)
+* `--patch-size`: side length (pixels) of center patch
+* `--dapi-index`, `--gob-index`, `--goa-index`: channel order controls
+* `--transpose-xy` / `--no-transpose-xy`: how ROI point coordinates are interpreted
+* `--load-saved-masks` / `--no-load-saved-masks`: reuse or recompute Cellpose masks
+
+### Interpreting the panel
+
+* Good result: boundaries follow nuclei contours and maxima mostly land on expected structures.
+* If maxima appear systematically shifted: try flipping `--transpose-xy`.
+* If nuclei segmentation is poor: check channel indices and try patch-size/ROI subsets first, then adjust segmentation settings in the pipeline.
 
 ---
 

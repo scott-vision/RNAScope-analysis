@@ -1,0 +1,6 @@
+cellpose
+scikit-image
+numpy
+pandas
+tifffile
+roifile
