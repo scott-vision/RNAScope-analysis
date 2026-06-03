@@ -46,7 +46,13 @@ class Config:
     """Half size of the cross used to mark spots in overlay images."""
 
     load_saved_masks: bool = True
-    """If ``True``, reuse previously computed Cellpose segmentation masks."""
+    """If ``True``, reuse previously computed segmentation masks."""
+
+    segmentation_backend: str = "cellpose"
+    """Segmentation backend label used in output filenames."""
+
+    segmentation_model: Path | None = None
+    """Optional fine-tuned Cellpose model path for nuclei segmentation."""
 
     transpose_xy: bool = True
     """Swap ROI (``x, y``) coordinates to (``y, x``) if required."""

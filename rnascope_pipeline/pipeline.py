@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+from dataclasses import asdict
+from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import roifile
 import tifffile as tiff
+import yaml
 
 from .analysis import analyze_roi, BIN_LABELS, summarize_bins
 from .config import Config
@@ -31,19 +34,49 @@ def _load_image(path: Path) -> np.ndarray:
     return img, layout
 
 
+def _write_run_settings_yaml(cfg: Config, *, expand_px: int) -> Path:
+    """Persist run settings for reproducibility."""
+    out_path = cfg.out_dir / f"run_settings_{cfg.segmentation_backend.lower()}.yaml"
+    payload = {
+        "generated_utc": datetime.now(timezone.utc).isoformat(),
+        "segmentation_backend": cfg.segmentation_backend,
+        "expand_px": expand_px,
+        "config": {k: str(v) if isinstance(v, Path) else v for k, v in asdict(cfg).items()},
+    }
+    with out_path.open("w", encoding="utf-8") as f:
+        yaml.safe_dump(payload, f, sort_keys=False)
+    return out_path
+
+
 def run_pipeline(cfg: Config) -> None:
     """Execute the complete RNAscope analysis pipeline."""
     ensure_dirs(cfg)
 
-    model = create_model()
+    if cfg.segmentation_model is not None:
+        cfg.segmentation_model = Path(cfg.segmentation_model).expanduser().resolve()
+        if not cfg.segmentation_model.exists():
+            raise FileNotFoundError(f"Segmentation model does not exist: {cfg.segmentation_model}")
+        if cfg.segmentation_backend == "cellpose":
+            cfg.segmentation_backend = "cellpose_finetuned"
+    model = create_model(cfg.segmentation_model)
     maxima_dir = cfg.root / "maxima"
     expand_px = int(round(cfg.expansion_um / cfg.pixel_size_um))
-    log(cfg, f"=== RNAscope pipeline start | root={cfg.root.resolve()} | expand={cfg.expansion_um}µm≈{expand_px}px ===")
+    settings_yaml = _write_run_settings_yaml(cfg, expand_px=expand_px)
+    log(
+        cfg,
+        f"=== RNAscope pipeline start | root={cfg.root.resolve()} | "
+        f"expand={cfg.expansion_um}µm≈{expand_px}px | seg={cfg.segmentation_backend} ===",
+    )
 
     per_nucleus_all = []
     per_roi_all = []
 
-    experiments = sorted(p for p in cfg.root.iterdir() if p.is_dir() and p.name.lower().startswith("rat"))
+    experiment_prefixes = ("rat", "mouse")
+    experiments = sorted(
+        p
+        for p in cfg.root.iterdir()
+        if p.is_dir() and p.name.lower().startswith(experiment_prefixes)
+    )
     log(cfg, f"found {len(experiments)} experiment(s): {[p.name for p in experiments]}")
 
     for exp in experiments:
@@ -72,6 +105,14 @@ def run_pipeline(cfg: Config) -> None:
                 f"  [{animal}/{region}] maxima files: GOA={(goa_path.name if goa_path else None)}, "
                 f"GOB={(gob_path.name if gob_path else None)}",
             )
+            if goa_path is None or gob_path is None:
+                missing = []
+                if goa_path is None:
+                    missing.append("GOA")
+                if gob_path is None:
+                    missing.append("GOB")
+                log(cfg, f"  [SKIP] {animal}/{region}: missing maxima file(s): {', '.join(missing)}")
+                continue
             goa_x_all, goa_y_all = read_points_roi(goa_path, cfg.transpose_xy)
             gob_x_all, gob_y_all = read_points_roi(gob_path, cfg.transpose_xy)
             log(cfg, f"  [{animal}/{region}] maxima totals: GOA={len(goa_x_all)}, GOB={len(gob_x_all)}")
@@ -117,10 +158,11 @@ def run_pipeline(cfg: Config) -> None:
     per_nuc_df = pd.DataFrame(per_nucleus_all)
     per_roi_df = pd.DataFrame(per_roi_all)
 
-    per_nuc_csv = cfg.csv_dir / "per_nucleus_counts.csv"
-    per_roi_csv = cfg.csv_dir / "per_roi_summary.csv"
+    seg_tag = cfg.segmentation_backend.lower()
+    per_nuc_csv = cfg.csv_dir / f"per_nucleus_counts_{seg_tag}.csv"
+    per_roi_csv = cfg.csv_dir / f"per_roi_summary_{seg_tag}.csv"
     per_nuc_df.to_csv(per_nuc_csv, index=False)
-    per_roi_df.to_csv(per_roi_csv, index=False)
+    per_roi_df.to_csv(per_roi_csv, index=False, na_rep="")
     log(cfg, f"wrote per-nucleus CSV → {per_nuc_csv}")
     log(cfg, f"wrote per-ROI CSV → {per_roi_csv}")
 
@@ -130,9 +172,9 @@ def run_pipeline(cfg: Config) -> None:
         total_cells = len(per_nuc_df)
         goa_all = per_nuc_df["GoA_expanded"].to_numpy(int)
         gob_all = per_nuc_df["GoB_expanded"].to_numpy(int)
-        avg_goa_all = float(goa_all.mean()) if total_cells > 0 else np.nan
-        avg_gob_all = float(gob_all.mean()) if total_cells > 0 else np.nan
-        avg_ratio_all = (avg_goa_all / avg_gob_all) if avg_gob_all > 0 else np.nan
+        avg_goa_all = float(goa_all.mean()) if total_cells > 0 else 0.0
+        avg_gob_all = float(gob_all.mean()) if total_cells > 0 else 0.0
+        avg_ratio_all = (avg_goa_all / avg_gob_all) if avg_gob_all > 0 else 0.0
         cells_more_goa_all = int(np.sum(goa_all > gob_all))
         cells_more_gob_all = int(np.sum(gob_all > goa_all))
         cells_no_spots_all = int(np.sum((goa_all == 0) & (gob_all == 0)))
@@ -170,13 +212,14 @@ def run_pipeline(cfg: Config) -> None:
         overall_rows.append(overall)
 
     overall_df = pd.DataFrame(overall_rows)
-    overall_csv = cfg.csv_dir / "overall_metrics.csv"
-    overall_df.to_csv(overall_csv, index=False)
+    overall_csv = cfg.csv_dir / f"overall_metrics_{seg_tag}.csv"
+    overall_df.to_csv(overall_csv, index=False, na_rep="")
     log(cfg, f"wrote overall CSV → {overall_csv}")
 
     print(f"Saved per‑nucleus → {per_nuc_csv}")
     print(f"Saved per‑ROI → {per_roi_csv}")
     print(f"Saved overall → {overall_csv}")
+    print(f"Saved run settings: {settings_yaml}")
     print(
         f"Cutouts in {cfg.cutouts_dir} | Overlays in {cfg.qc_overlays_dir} | Masks in {cfg.masks_dir}"
     )

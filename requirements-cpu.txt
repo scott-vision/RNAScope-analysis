@@ -1,4 +1,5 @@
 cellpose
+PyYAML
 scikit-image
 numpy
 pandas

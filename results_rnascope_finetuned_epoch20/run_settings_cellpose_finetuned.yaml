@@ -1,0 +1,18 @@
+generated_utc: '2026-06-03T12:48:30.658840+00:00'
+segmentation_backend: cellpose_finetuned
+expand_px: 17
+config:
+  root: D:\Scott\home\Brook\RNAScope-analysis\Max-Projections
+  out_dir: D:\Scott\home\Brook\RNAScope-analysis\results_rnascope_finetuned_epoch20
+  pixel_size_um: 0.1455
+  expansion_um: 2.5
+  dapi_index: 0
+  gob_index: 1
+  goa_index: 2
+  spot_marker_size: 1
+  load_saved_masks: true
+  segmentation_backend: cellpose_finetuned
+  segmentation_model: D:\Scott\home\Brook\RNAScope-analysis\Max-Projections\snapshots\snap_20260603_120503_843296\train\models\cpsam_rnascope_epoch_0020
+  transpose_xy: true
+  skip_empty_roi: true
+  debug: true

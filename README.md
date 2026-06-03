@@ -293,7 +293,7 @@ Enable a GPU for Cellpose if possible. Large numbers of ROIs or very large image
 
 ## Extending
 
-* Swap nuclei segmentation model (e.g., StarDist) by replacing `segment_nuclei` in `segmentation.py`.
+* Swap nuclei segmentation model by replacing `segment_nuclei` in `segmentation.py`.
 * Add per‑cell intensity features by sampling `cutout_masked` with nucleus labels.
 * Export spots as per‑ROI CSVs with local/global coordinates.
 

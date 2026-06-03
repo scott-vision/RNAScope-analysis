@@ -1,0 +1,2 @@
+source=D:/Scott/home/Brook/RNAScope-analysis/Max-Projections/Mouse2/20250812_mouse_2_63x_thal_max_cropped.tif
+workspace=D:/Scott/home/Brook/RNAScope-analysis/Max-Projections

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-import re
 import shutil
 from typing import Dict, List, Tuple
 
@@ -100,15 +99,23 @@ def read_points_roi(roi_path: Path | None, transpose_xy: bool = False) -> Tuple[
 
 def find_maxima_files(maxima_dir: Path, animal: str, region: str) -> Dict[str, Path | None]:
     """Locate GOA and GOB maxima ROI files for ``animal`` and ``region``."""
-    patt = re.compile(rf"^{re.escape(animal)}_{re.escape(region)}_([a-zA-Z]+)_maxima\.roi$")
     out: Dict[str, Path | None] = {"GOA": None, "GOB": None}
-    for p in maxima_dir.glob(f"{animal}_{region}_*_maxima.roi"):
-        m = patt.match(p.name)
-        if not m:
+    search_dirs = [maxima_dir]
+    animal_dir = maxima_dir.parent / animal
+    if animal_dir not in search_dirs:
+        search_dirs.append(animal_dir)
+
+    animal_tag = animal.lower()
+    region_tag = region.lower()
+    for search_dir in search_dirs:
+        if not search_dir.is_dir():
             continue
-        tag = m.group(1).lower()
-        if "goa" in tag:
-            out["GOA"] = p
-        elif "gob" in tag:
-            out["GOB"] = p
+        for p in search_dir.glob("*.roi"):
+            name = p.name.lower()
+            if animal_tag not in name or region_tag not in name or "maxima" not in name:
+                continue
+            if "goa" in name:
+                out["GOA"] = p
+            elif "gob" in name:
+                out["GOB"] = p
     return out

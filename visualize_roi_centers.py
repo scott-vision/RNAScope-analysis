@@ -11,12 +11,14 @@ For each experiment folder under Max-Projections (e.g. Rat1, Mouse0), this scrip
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Iterable, Tuple
 
 import numpy as np
 import roifile
 import tifffile as tiff
+import yaml
 from skimage.io import imsave
 from skimage.segmentation import find_boundaries
 
@@ -174,6 +176,30 @@ def _iter_experiments(root: Path) -> Iterable[Path]:
     return sorted(p for p in root.iterdir() if p.is_dir() and (p.name.lower().startswith("rat") or p.name.lower().startswith("mouse")))
 
 
+def _write_settings_yaml(args: argparse.Namespace, out_dir: Path) -> Path:
+    out_path = out_dir / "qc_run_settings_cellpose.yaml"
+    payload = {
+        "generated_utc": datetime.now(timezone.utc).isoformat(),
+        "script": "visualize_roi_centers.py",
+        "settings": {
+            "root": str(args.root),
+            "out": str(args.out),
+            "patch_size": args.patch_size,
+            "dapi_index": args.dapi_index,
+            "gob_index": args.gob_index,
+            "goa_index": args.goa_index,
+            "segmentation_backend": "cellpose",
+            "transpose_xy": args.transpose_xy,
+            "max_rois_per_region": args.max_rois_per_region,
+            "animals": args.animals,
+            "load_saved_masks": args.load_saved_masks,
+        },
+    }
+    with out_path.open("w", encoding="utf-8") as f:
+        yaml.safe_dump(payload, f, sort_keys=False)
+    return out_path
+
+
 def main() -> None:
     args = parse_args()
 
@@ -181,6 +207,7 @@ def main() -> None:
     out_masks = args.out / "masks"
     out_qc.mkdir(parents=True, exist_ok=True)
     out_masks.mkdir(parents=True, exist_ok=True)
+    settings_yaml = _write_settings_yaml(args, args.out)
 
     model = create_model()
     selected = {a.lower() for a in args.animals} if args.animals else None
@@ -236,7 +263,7 @@ def main() -> None:
                 gob_x, gob_y = _in_roi_and_local(gob_x_all, gob_y_all, roi_mask, x0, y0)
 
                 dapi = cutout_masked[..., args.dapi_index]
-                mask_path = out_masks / f"{animal}_{region}_{roi_name}_labels.tif"
+                mask_path = out_masks / f"{animal}_{region}_{roi_name}_cellpose_labels.tif"
                 if args.load_saved_masks and mask_path.exists():
                     labels = tiff.imread(str(mask_path)).astype(np.int32)
                 else:
@@ -267,12 +294,16 @@ def main() -> None:
                 sep = np.full((orig_patch.shape[0], 8, 3), 255, dtype=np.uint8)
                 panel = np.concatenate([orig_patch, sep, seg_patch], axis=1)
 
-                out_name = f"{animal}_{region}_{roi_name}_center_qc.png"
+                out_name = f"{animal}_{region}_{roi_name}_cellpose_center_qc.png"
                 imsave(str(out_qc / out_name), panel)
                 print(f"    saved {out_name}")
 
     print(f"Done. QC panels: {out_qc}")
-    print("Panel format: left=original composite (R=GoA, G=GoB, B=DAPI), right=Cellpose boundaries + maxima (GOA=magenta, GOB=cyan)")
+    print(f"Saved run settings: {settings_yaml}")
+    print(
+        "Panel format: left=original composite (R=GoA, G=GoB, B=DAPI), "
+        "right=segmentation boundaries + maxima (GOA=magenta, GOB=cyan)"
+    )
 
 
 if __name__ == "__main__":

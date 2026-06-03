@@ -59,6 +59,7 @@ def analyze_roi(
     """Analyse a single polygon ROI and return per‑nucleus and per‑ROI metrics."""
     t0 = time.perf_counter()
     log(cfg, f"  > ROI '{roi_name}': starting analysis")
+    seg_tag = cfg.segmentation_backend.lower()
 
     # Prepare cut‑out and free‑form mask
     cutout, (y0, y1, x0, x1) = tight_crop_nd(full_img, roi_mask)
@@ -71,9 +72,9 @@ def analyze_roi(
     )
 
     # Save masked cut‑out
-    cutout_name = f"{animal}_{region}_{roi_name}_cutout.tif"
+    cutout_name = f"{animal}_{region}_{roi_name}_{seg_tag}_cutout.tif"
     tiff.imwrite(str(cfg.cutouts_dir / cutout_name), cutout_masked)
-    roi_mask_name = f"{animal}_{region}_{roi_name}_roi_mask_cropped.tif"
+    roi_mask_name = f"{animal}_{region}_{roi_name}_{seg_tag}_roi_mask_cropped.tif"
     tiff.imwrite(str(cfg.roi_masks_dir / roi_mask_name), (mask_c.astype(np.uint8) * 255))
 
     # DAPI channel for segmentation
@@ -107,15 +108,15 @@ def analyze_roi(
     gob_overlay = apply_orange_hot_lut(gob_bg)
     draw_crosses_inplace(goa_overlay, goa_x, goa_y, color=(0, 255, 255), size=cfg.spot_marker_size)
     draw_crosses_inplace(gob_overlay, gob_x, gob_y, color=(0, 255, 255), size=cfg.spot_marker_size)
-    overlay_name_goa = f"{animal}_{region}_{roi_name}_goa_maxima.png"
-    overlay_name_gob = f"{animal}_{region}_{roi_name}_gob_maxima.png"
+    overlay_name_goa = f"{animal}_{region}_{roi_name}_{seg_tag}_goa_maxima.png"
+    overlay_name_gob = f"{animal}_{region}_{roi_name}_{seg_tag}_gob_maxima.png"
     imsave(str(cfg.qc_overlays_dir / overlay_name_goa), goa_overlay)
     imsave(str(cfg.qc_overlays_dir / overlay_name_gob), gob_overlay)
     log(cfg, f"    saved GOA overlay → {cfg.qc_overlays_dir / overlay_name_goa}")
     log(cfg, f"    saved GOB overlay → {cfg.qc_overlays_dir / overlay_name_gob}")
 
     # Segment nuclei
-    mask_path = cfg.masks_dir / f"{animal}_{region}_{roi_name}_labels.tif"
+    mask_path = cfg.masks_dir / f"{animal}_{region}_{roi_name}_{seg_tag}_labels.tif"
     if cfg.load_saved_masks and mask_path.exists():
         labels = tiff.imread(str(mask_path)).astype(np.int32)
         log(cfg, f"    loaded labels from cache: {mask_path.name}")
@@ -151,7 +152,7 @@ def analyze_roi(
     goa_total = int(len(goa_x))
     gob_density = (gob_total / roi_area_um2) if roi_area_um2 > 0 else 0.0
     goa_density = (goa_total / roi_area_um2) if roi_area_um2 > 0 else 0.0
-    ratio_goa_gob = (goa_total / gob_total) if gob_total > 0 else np.nan
+    ratio_goa_gob = (goa_total / gob_total) if gob_total > 0 else 0.0
     log(
         cfg,
         f"    ROI area={roi_area_um2:.2f} µm² | densities: GOA={goa_density:.4f}/µm², "
@@ -214,10 +215,10 @@ def analyze_roi(
     hscore_goa = sum(b * c for b, c in bins_goa.items())
     hscore_gob = sum(b * c for b, c in bins_gob.items())
 
-    avg_goa_per_cell = float(np.mean(goa_exp_counts)) if len(goa_exp_counts) > 0 else np.nan
-    avg_gob_per_cell = float(np.mean(gob_exp_counts)) if len(gob_exp_counts) > 0 else np.nan
+    avg_goa_per_cell = float(np.mean(goa_exp_counts)) if len(goa_exp_counts) > 0 else 0.0
+    avg_gob_per_cell = float(np.mean(gob_exp_counts)) if len(gob_exp_counts) > 0 else 0.0
     ratio_avg_goa_gob = (
-        (avg_goa_per_cell / avg_gob_per_cell) if avg_gob_per_cell > 0 else np.nan
+        (avg_goa_per_cell / avg_gob_per_cell) if avg_gob_per_cell > 0 else 0.0
     )
 
     log(

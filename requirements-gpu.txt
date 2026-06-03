@@ -3,6 +3,7 @@ torch
 torchvision
 torchaudio
 cellpose
+PyYAML
 scikit-image
 numpy
 pandas
