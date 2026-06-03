@@ -4,3 +4,4 @@ __pycache__/
 Max-Projections/
 *.pt
 *.tif
+/results_rnascope_finetuned_epoch20

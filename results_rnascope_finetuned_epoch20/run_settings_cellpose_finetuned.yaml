@@ -1,4 +1,4 @@
-generated_utc: '2026-06-03T12:48:30.658840+00:00'
+generated_utc: '2026-06-03T13:18:30.308501+00:00'
 segmentation_backend: cellpose_finetuned
 expand_px: 17
 config:
@@ -13,6 +13,8 @@ config:
   load_saved_masks: true
   segmentation_backend: cellpose_finetuned
   segmentation_model: D:\Scott\home\Brook\RNAScope-analysis\Max-Projections\snapshots\snap_20260603_120503_843296\train\models\cpsam_rnascope_epoch_0020
+  species_filter: mouse
+  experiments: []
   transpose_xy: true
   skip_empty_roi: true
   debug: true

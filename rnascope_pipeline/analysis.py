@@ -121,7 +121,12 @@ def analyze_roi(
         labels = tiff.imread(str(mask_path)).astype(np.int32)
         log(cfg, f"    loaded labels from cache: {mask_path.name}")
     else:
-        labels = segment_nuclei(dapi, model)
+        labels = segment_nuclei(
+            dapi,
+            model,
+            patch_size=cfg.inference_patch_size,
+            downsample=cfg.inference_downsample,
+        )
         labels[~mask_c] = 0
         tiff.imwrite(str(mask_path), labels.astype(np.uint16))
         log(cfg, f"    computed & saved labels: n_nuclei={int(labels.max())}")

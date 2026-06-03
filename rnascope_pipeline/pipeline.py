@@ -58,6 +58,11 @@ def run_pipeline(cfg: Config) -> None:
             raise FileNotFoundError(f"Segmentation model does not exist: {cfg.segmentation_model}")
         if cfg.segmentation_backend == "cellpose":
             cfg.segmentation_backend = "cellpose_finetuned"
+    if cfg.inference_patch_size is not None and cfg.inference_downsample > 1:
+        if cfg.segmentation_backend in {"cellpose", "cellpose_finetuned"}:
+            cfg.segmentation_backend = (
+                f"{cfg.segmentation_backend}_p{cfg.inference_patch_size}_ds{cfg.inference_downsample}"
+            )
     model = create_model(cfg.segmentation_model)
     maxima_dir = cfg.root / "maxima"
     expand_px = int(round(cfg.expansion_um / cfg.pixel_size_um))
@@ -71,12 +76,27 @@ def run_pipeline(cfg: Config) -> None:
     per_nucleus_all = []
     per_roi_all = []
 
-    experiment_prefixes = ("rat", "mouse")
+    if cfg.species_filter == "mouse":
+        experiment_prefixes = ("mouse",)
+    elif cfg.species_filter == "rat":
+        experiment_prefixes = ("rat",)
+    elif cfg.species_filter == "all":
+        experiment_prefixes = ("rat", "mouse")
+    else:
+        raise ValueError(f"Unknown species_filter: {cfg.species_filter}")
+
+    requested_experiments = {name.lower() for name in cfg.experiments}
     experiments = sorted(
         p
         for p in cfg.root.iterdir()
         if p.is_dir() and p.name.lower().startswith(experiment_prefixes)
     )
+    if requested_experiments:
+        experiments = [p for p in experiments if p.name.lower() in requested_experiments]
+        found_names = {p.name.lower() for p in experiments}
+        missing_names = sorted(requested_experiments - found_names)
+        if missing_names:
+            log(cfg, f"[WARN] requested experiment(s) not found or filtered out: {missing_names}")
     log(cfg, f"found {len(experiments)} experiment(s): {[p.name for p in experiments]}")
 
     for exp in experiments:

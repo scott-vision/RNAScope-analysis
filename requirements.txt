@@ -1,0 +1,8 @@
+cellpose
+PyYAML
+scikit-image
+numpy
+pandas
+tifffile
+roifile
+ultralytics

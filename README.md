@@ -14,42 +14,63 @@ The workflow:
 ## Requirements
 
 * **Python** ≥ 3.9 (3.10–3.12 recommended)
-* Packages:
+* An NVIDIA GPU and current NVIDIA driver for GPU acceleration.
+* Anaconda or Miniconda.
 
-  * `cellpose`
-  * `scikit-image`
-  * `numpy`
-  * `pandas`
-  * `tifffile`
-  * `roifile`
+Install with conda in a fresh environment. On a new GPU PC, install PyTorch first so the CUDA-enabled wheels are selected before Cellpose and the rest of the project dependencies.
 
-Install with conda in a fresh environment.
+### Fresh Windows GPU install (recommended)
+
+Open **Anaconda Prompt** and run:
+
+```bat
+cd /d D:\Scott\home\Brook\RNAScope-analysis
+
+conda create -n rnascope-gpu python=3.10 -y
+conda activate rnascope-gpu
+
+python -m pip install --upgrade pip setuptools wheel
+
+python -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu126
+python -m pip install -r requirements-gpu.txt
+python -m pip install -e .
+```
+
+Verify the install:
+
+```bat
+python -c "import torch; print('CUDA available:', torch.cuda.is_available()); print('CUDA devices:', torch.cuda.device_count())"
+python -c "from cellpose import models; m=models.CellposeModel(gpu=True); print('Cellpose GPU model OK')"
+python -m rnascope_pipeline --help
+```
+
+If `CUDA available` is `False`, update the NVIDIA driver first. If the PC needs a different PyTorch CUDA build, use the selector at https://pytorch.org/get-started/locally/ and replace the `--index-url` line above.
 
 ### Option A: CPU (no GPU acceleration)
 
 ```bash
 conda create -n rnascope-cpu python=3.10 -y
 conda activate rnascope-cpu
-python -m pip install --upgrade pip
+python -m pip install --upgrade pip setuptools wheel
 pip install -r requirements-cpu.txt
 pip install -e .
 ```
 
-### Option B: GPU (faster Cellpose)
+### Existing GPU environment refresh
 
 ```bash
-conda create -n rnascope-gpu python=3.10 -y
 conda activate rnascope-gpu
-python -m pip install --upgrade pip
+python -m pip install --upgrade pip setuptools wheel
+python -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu126
 pip install -r requirements-gpu.txt
 pip install -e .
 ```
 
 Notes:
 
-* `requirements-gpu.txt` targets CUDA 12.6 wheels from PyTorch.
-* If your CUDA runtime is different, update the first line in `requirements-gpu.txt` using the selector at https://pytorch.org/get-started/locally/.
-* Verify GPU availability with: `python -c "import torch; print(torch.cuda.is_available())"`
+* `requirements.txt` contains the shared Python dependencies.
+* `requirements-gpu.txt` and `requirements-cpu.txt` include the shared dependencies; GPU PyTorch is installed explicitly before `requirements-gpu.txt`.
+* The GUI uses `ultralytics` for point-based SAM mask editing.
 
 ---
 

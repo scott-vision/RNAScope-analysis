@@ -54,6 +54,18 @@ class Config:
     segmentation_model: Path | None = None
     """Optional fine-tuned Cellpose model path for nuclei segmentation."""
 
+    inference_patch_size: int | None = None
+    """Optional model-input patch size for tiled segmentation inference."""
+
+    inference_downsample: int = 1
+    """Source-to-model downsample factor for tiled segmentation inference."""
+
+    species_filter: str = "all"
+    """Experiment species filter: ``all``, ``mouse``, or ``rat``."""
+
+    experiments: tuple[str, ...] = ()
+    """Optional explicit experiment folder names to process."""
+
     transpose_xy: bool = True
     """Swap ROI (``x, y``) coordinates to (``y, x``) if required."""
 

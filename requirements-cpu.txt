@@ -1,7 +1,1 @@
-cellpose
-PyYAML
-scikit-image
-numpy
-pandas
-tifffile
-roifile
+-r requirements.txt
