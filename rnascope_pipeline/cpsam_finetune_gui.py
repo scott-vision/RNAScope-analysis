@@ -33,6 +33,24 @@ SESSION_PATHS_FILE = Path(__file__).resolve().parents[1] / "cpsam_last_paths.txt
 BEST_VAL_SAVE_EVERY = 5
 
 
+class _TrainingCanceled(Exception):
+    pass
+
+
+class _CancelableTrainingHandler(logging.StreamHandler):
+    def __init__(self, writer, cancel_requested) -> None:
+        super().__init__(writer)
+        self.cancel_requested = cancel_requested
+        self.training_thread = threading.get_ident()
+
+    def emit(self, record) -> None:
+        super().emit(record)
+        if (threading.get_ident() == self.training_thread
+                and record.name.startswith("cellpose.train")
+                and self.cancel_requested()):
+            raise _TrainingCanceled("Training canceled at a Cellpose progress boundary")
+
+
 @dataclass
 class PatchItem:
     patch_id: str
@@ -995,6 +1013,9 @@ class CpsamFineTuneApp:
             return
 
     def _on_close(self) -> None:
+        if self.worker_thread is not None and self.worker_thread.is_alive():
+            messagebox.showwarning("Task running", "Wait for the active task to finish before closing. Use Cancel Training to stop training.")
+            return
         self._save_last_paths()
         self.root.destroy()
 
@@ -1174,11 +1195,12 @@ class CpsamFineTuneApp:
             return models.CellposeModel(gpu=gpu, model_type="cpsam")
 
     def autolabel_train_patches(self) -> None:
-        items = self._load_patch_pairs()
+        items = [item for item in self._load_patch_pairs()
+                 if item.annotation_status == "auto" and item.include]
         if not items:
             messagebox.showerror(
                 "No train patches",
-                "No patches found in manifest/pool.",
+                "No included auto-status patches to label. Edited and approved masks are protected.",
             )
             return
 
@@ -1791,6 +1813,9 @@ class CpsamFineTuneApp:
         self._log("Populated Cellpose API training call.")
 
     def run_training_command(self) -> None:
+        if self.worker_thread is not None and self.worker_thread.is_alive():
+            messagebox.showwarning("Busy", "A background task is still running.")
+            return
         try:
             cfg = self._build_train_api_config()
         except Exception as exc:
@@ -1816,29 +1841,34 @@ class CpsamFineTuneApp:
             params=params,
         )
         self.run_id_active = run_id
+        cfg["run_id"] = run_id
+        store = self._get_store()
+        self.training_cancel_requested = False
+        self.training_active = True
         run_log_path = self.workspace_dir / "runs" / run_id / "train.log"
 
         def _job() -> None:
-            self.training_cancel_requested = False
-            self.training_active = True
             self._log(f"Running Cellpose API training:\n{api_summary}")
             try:
                 with run_log_path.open("w", encoding="utf-8") as log_fh:
                     model_output_path = self._run_cellpose_training_api(cfg, log_fh)
                 if self.training_cancel_requested:
-                    self._log("Cancel was requested; Cellpose API call has returned.")
-                    self._get_store().finalize_run(run_id, status="canceled")
-                else:
-                    model_output_path = self._postprocess_training_output(
-                        run_log_path, api_model_path=model_output_path
-                    )
-                    self._log("Training completed.")
-                    self._get_store().finalize_run(
-                        run_id, status="success", model_output_path=model_output_path
-                    )
+                    self._log("Training completed before cancellation took effect.")
+                model_output_path = self._postprocess_training_output(
+                    run_log_path, api_model_path=model_output_path,
+                    best_val=cfg["save_each"] and cfg["n_test"] > 0,
+                )
+                self._log("Training completed.")
+                store.finalize_run(
+                    run_id, status="success", model_output_path=model_output_path
+                )
+            except _TrainingCanceled as exc:
+                self._log(str(exc))
+                partial = cfg["train_root"] / "models" / f"{cfg['model_name_out']}_canceled_{run_id}"
+                store.finalize_run(run_id, status="canceled", model_output_path=str(partial) if partial.is_file() else "")
             except Exception as exc:
                 self._log(f"Cellpose API training failed: {exc}")
-                self._get_store().finalize_run(run_id, status="failed")
+                store.finalize_run(run_id, status="failed")
             finally:
                 self.training_active = False
                 self.training_cancel_requested = False
@@ -1961,19 +1991,29 @@ class CpsamFineTuneApp:
             writer.write(f"Loaded {len(test_data)} validation pair(s)\n")
         if skipped:
             writer.write(f"Skipped unsupported Cellpose train_seg parameter(s): {', '.join(skipped)}\n")
-        handler = logging.StreamHandler(writer)
+        handler = _CancelableTrainingHandler(writer, lambda: self.training_cancel_requested)
         root_logger = logging.getLogger()
         old_level = root_logger.level
         root_logger.addHandler(handler)
-        if cfg["verbose"]:
-            root_logger.setLevel(logging.INFO)
+        train_logger = logging.getLogger("cellpose.train")
+        old_train_level = train_logger.level
+        train_logger.setLevel(logging.INFO)
+        root_logger.setLevel(logging.INFO)
         try:
+            if self.training_cancel_requested:
+                raise _TrainingCanceled("Training canceled before training began")
             with contextlib.redirect_stdout(writer), contextlib.redirect_stderr(writer):
                 result = train_seg(model.net, **filtered)
+        except _TrainingCanceled:
+            partial = cfg["train_root"] / "models" / f"{cfg['model_name_out']}_canceled_{cfg['run_id']}"
+            partial.parent.mkdir(parents=True, exist_ok=True)
+            model.net.save_model(str(partial))
+            raise
         finally:
             writer.flush()
             root_logger.removeHandler(handler)
             root_logger.setLevel(old_level)
+            train_logger.setLevel(old_train_level)
         return self._extract_model_path_from_train_result(
             result,
             train_root=cfg["train_root"],
@@ -2004,22 +2044,13 @@ class CpsamFineTuneApp:
                 return str(resolved)
         return ""
 
-    def _postprocess_training_output(self, run_log_path: Path, api_model_path: str = "") -> str:
-        if api_model_path:
-            model_path = Path(api_model_path)
-            if model_path.exists():
-                resolved = str(model_path.resolve())
-                self.trained_model_path_var.set(resolved)
-                return resolved
-
-        if not run_log_path.exists():
-            return ""
+    def _postprocess_training_output(self, run_log_path: Path, api_model_path: str = "", best_val: bool = False) -> str:
         try:
             lines = run_log_path.read_text(encoding="utf-8", errors="replace").splitlines()
         except OSError:
-            return ""
+            lines = []
 
-        base_model_path = ""
+        base_model_path = api_model_path
         re_base = re.compile(r"saving model to (.+)$")
         re_loss = re.compile(r"^\s*(\d+),\s*train_loss=.*?test_loss=([0-9]*\.?[0-9]+)")
         best_epoch: int | None = None
@@ -2040,7 +2071,7 @@ class CpsamFineTuneApp:
                 best_epoch = epoch
 
         candidate = ""
-        if self.train_best_val_var.get() and base_model_path and scored_epochs:
+        if best_val and base_model_path and scored_epochs:
             for loss_val, epoch_val in sorted(scored_epochs, key=lambda x: x[0]):
                 epoch_path = Path(f"{base_model_path}_epoch_{epoch_val:04d}")
                 if epoch_path.exists():
@@ -2062,7 +2093,7 @@ class CpsamFineTuneApp:
                 candidate = str(final_path.resolve())
 
         if candidate:
-            self.trained_model_path_var.set(candidate)
+            self.root.after(0, lambda: self.trained_model_path_var.set(candidate))
         return candidate
 
     def cancel_training(self) -> None:
@@ -2071,7 +2102,7 @@ class CpsamFineTuneApp:
             return
         self.training_cancel_requested = True
         self._log(
-            "Cancel requested. Cellpose API training runs in-process, so it will stop only when the API call returns."
+            "Cancel requested. Training will stop at the next Cellpose progress boundary and save a partial checkpoint."
         )
 
     def _load_trained_model(self):
@@ -2454,7 +2485,7 @@ class CpsamFineTuneApp:
             messagebox.showwarning("Busy", "A background task is still running.")
             return
 
-        self.worker_thread = threading.Thread(target=job, daemon=True)
+        self.worker_thread = threading.Thread(target=job, daemon=False)
         self.worker_thread.start()
 
     def run(self) -> None:

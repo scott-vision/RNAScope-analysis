@@ -319,20 +319,18 @@ class DatasetStore:
                     it["split"] = "test"
 
         valid_splits = {"train", "val", "test"}
-        has_manual_splits = any((r.get("split", "").strip().lower() in valid_splits) for r in rows)
-        all_split_assigned = all((r.get("split", "").strip().lower() in valid_splits) for r in rows)
-        if has_manual_splits and all_split_assigned:
-            for r in rows:
-                r["split"] = r.get("split", "train").strip().lower()
-        else:
+        for r in rows:
+            r["split"] = r.get("split", "").strip().lower()
+        unassigned = [r for r in rows if r["split"] not in valid_splits]
+        if unassigned:
             if stratify_by_source:
                 by_source: dict[str, list[dict[str, str]]] = {}
-                for r in rows:
+                for r in unassigned:
                     by_source.setdefault(r.get("source_id", "unknown"), []).append(r)
                 for vals in by_source.values():
                     assign_split(vals)
             else:
-                assign_split(rows)
+                assign_split(unassigned)
 
         for r in rows:
             pid = r["patch_id"]
